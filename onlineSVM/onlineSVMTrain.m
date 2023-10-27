@@ -1,0 +1,51 @@
+function [w, b] = onlineSVMTrain(X, y, C, w, b)
+%TRAIN_PA Train/update passive-aggressive online learner
+%
+%   w = train_pa(X, y, C, w)
+%
+% The function trains or updates a linear classifier using the
+% passive-aggressive online learning algorithm. The variable C is the
+% agressiveness parameter. The functions assumes the labels are in [-1, +1].
+%
+% 约定的输入维度：
+%       X::[N,D]
+%       y::[N,1]
+
+[N, ~] = size(X);%约定的特征组成
+iter = 1;
+% 随机小批量训练
+batch_size = 1;%小批量训练
+
+% R_max = max( sum(X.^2, 2) );%样本的模值的最大值
+% 判断样本标签是否合法
+if any(~(y == -1 | y == 1))
+    error('Labels should be in [-1, 1].');
+end
+
+%% 训练参数，还有继承之前的结果，而非全新重新训练
+% Perform updates
+for i=1:iter
+    % 打乱训练样本
+    rng(0);
+    rand_index = randperm(N);%不重复的随机排列，加入随机表现不稳定
+    X = X(rand_index,:);% 打乱样本
+    y = y(rand_index);
+    for n=1:batch_size:(N-batch_size)
+        % Perform prediction and suffer loss
+        % 计算一个batch_size的loss
+        loss = sum( max(0, 1 - y(n:n+batch_size-1) .* (X(n:n+batch_size-1,:) * w + b)) );%增加了偏置b
+%         loss = sum( max( 0, 1 - y(n:n+batch_size-1) .* (X(n:n+batch_size-1,:) * w) ) );
+        % Update weights
+        % 采用PA算法进行迭代更新
+        if loss > 0
+%             w = w + (loss ./ (sum(X(n,:) .^ 2) + (1 ./ (2 .* C)))) * (X(n,:)' * y(n));
+
+            learning_rate = (loss./batch_size) ./ ( sum(X(n:n+batch_size-1,:) .^ 2,"all")./batch_size + (1 ./ (2 .* C)) );
+          
+            w = w + learning_rate/batch_size ...
+                    * sum( X(n:n+batch_size-1,:)' .* y(n:n+batch_size-1)', 2 );
+            b = b + learning_rate/batch_size  * sum(y(n:n+batch_size-1));
+        end
+    end
+end
+end
